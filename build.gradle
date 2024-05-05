@@ -1,0 +1,25 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'me.theentropyshard'
+version = '1.0-SNAPSHOT'
+
+def theMainClass = 'me.theentropyshard.isoblock.Main'
+
+application {
+    mainClass = theMainClass
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    flatlaf = '3.4.1'
+}
+
+dependencies {
+    implementation "com.formdev:flatlaf:$flatlaf"
+}
