@@ -1,55 +1,61 @@
 package me.theentropyshard.isoblock.render;
 
-import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 public class IsometricBlockRenderer {
     public static final int TEXTURE_SIZE = 16;
 
-    public static void render(
-            Path topImagePath, Path leftImagePath, Path rightImagePath,
-            int scale, boolean noShadow, Path outputPath, String format
-    ) throws Exception {
-
-        BufferedImage topImage = IsometricBlockRenderer.scale(IsometricBlockRenderer.loadImage(topImagePath), scale);
-        BufferedImage leftImage = noShadow ? IsometricBlockRenderer.scale(IsometricBlockRenderer.loadImage(leftImagePath), scale) : IsometricBlockRenderer.applyShadow(IsometricBlockRenderer.scale(IsometricBlockRenderer.loadImage(leftImagePath), scale), 1);
-        BufferedImage rightImage = noShadow ? IsometricBlockRenderer.scale(IsometricBlockRenderer.loadImage(rightImagePath), scale) : IsometricBlockRenderer.applyShadow(IsometricBlockRenderer.scale(IsometricBlockRenderer.loadImage(rightImagePath), scale), 2);
+    public static BufferedImage render(BufferedImage top, BufferedImage left, BufferedImage right, RenderOptions options) {
+        top = IsometricBlockRenderer.processTopImage(top, options);
+        left = IsometricBlockRenderer.processLeftImage(left, options);
+        right = IsometricBlockRenderer.processRightImage(right, options);
 
         float isoWidth = 0.5f;
         float skew = isoWidth * 2;
-        float z = (float) (scale * IsometricBlockRenderer.TEXTURE_SIZE) / 2;
-        float sideHeight = topImage.getHeight() * 1.2f;
+        float z = (float) (options.getScale() * IsometricBlockRenderer.TEXTURE_SIZE) / 2;
+        float sideHeight = top.getHeight() * 1.2f;
 
-        BufferedImage image = new BufferedImage(topImage.getWidth() * 2, (int) (topImage.getHeight() + rightImage.getHeight() * 1.2f), BufferedImage.TYPE_INT_ARGB);
+        BufferedImage image = new BufferedImage(top.getWidth() * 2, (int) (top.getHeight() + right.getHeight() * 1.2f), BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
 
         g.setTransform(new AffineTransform(1, -isoWidth, 1, isoWidth, 0, 0));
-        g.drawImage(topImage, (int) (-z - 1), (int) z, topImage.getWidth(), (int) (topImage.getHeight() + 1.5), null);
+        g.drawImage(top, (int) (-z - 1), (int) z, top.getWidth(), (int) (top.getHeight() + 1.5), null);
 
-        float x = IsometricBlockRenderer.TEXTURE_SIZE * scale;
+        float x = IsometricBlockRenderer.TEXTURE_SIZE * options.getScale();
         g.setTransform(new AffineTransform(1, -isoWidth, 0, skew, 0, isoWidth));
-        g.drawImage(rightImage, (int) x, (int) (x + z), rightImage.getWidth(), (int) sideHeight, null);
+        g.drawImage(right, (int) x, (int) (x + z), right.getWidth(), (int) sideHeight, null);
 
         g.setTransform(new AffineTransform(1, isoWidth, 0, skew, 0, 0));
-        g.drawImage(leftImage, 0, (int) z, leftImage.getWidth(), (int) sideHeight, null);
+        g.drawImage(left, 0, (int) z, left.getWidth(), (int) sideHeight, null);
 
-        ImageIO.write(image, format, Files.newOutputStream(outputPath));
+        g.dispose();
+
+        return image;
     }
 
-    private static int[] getPixels(BufferedImage image) {
-        return ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
+    private static BufferedImage processTopImage(BufferedImage top, RenderOptions options) {
+        return IsometricBlockRenderer.scale(top, options.getScale());
     }
 
-    private static BufferedImage applyShadow(BufferedImage image, int multiplier) {
-        int[] pixels = IsometricBlockRenderer.getPixels(image);
+    private static BufferedImage processLeftImage(BufferedImage left, RenderOptions options) {
+        BufferedImage scaled = IsometricBlockRenderer.scale(left, options.getScale());
+
+        return options.isNoShadow() ? scaled : IsometricBlockRenderer.shadow(scaled, 1);
+    }
+
+    private static BufferedImage processRightImage(BufferedImage right, RenderOptions options) {
+        BufferedImage scaled = IsometricBlockRenderer.scale(right, options.getScale());
+
+        return options.isNoShadow() ? scaled : IsometricBlockRenderer.shadow(scaled, 2);
+    }
+
+    private static BufferedImage shadow(BufferedImage image, int multiplier) {
+        int[] pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 
         float val = 1.25f * multiplier;
 
@@ -84,30 +90,5 @@ public class IsometricBlockRenderer {
         g.dispose();
 
         return scaledImage;
-    }
-
-    private static BufferedImage loadImage(Path path) throws IOException {
-        BufferedImage bufferedImage = ImageIO.read(Files.newInputStream(path));
-
-        if (bufferedImage.getWidth() != IsometricBlockRenderer.TEXTURE_SIZE) {
-            throw new RuntimeException("Texture width must be " + IsometricBlockRenderer.TEXTURE_SIZE + " pixels");
-        }
-
-        if (bufferedImage.getHeight() != IsometricBlockRenderer.TEXTURE_SIZE) {
-            throw new RuntimeException("Texture height must be " + IsometricBlockRenderer.TEXTURE_SIZE + " pixels");
-        }
-
-        BufferedImage image = new BufferedImage(
-                IsometricBlockRenderer.TEXTURE_SIZE,
-                IsometricBlockRenderer.TEXTURE_SIZE,
-                BufferedImage.TYPE_INT_ARGB
-        );
-
-        Graphics2D g = image.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.drawImage(bufferedImage, 0, 0, null);
-        g.dispose();
-
-        return image;
     }
 }
